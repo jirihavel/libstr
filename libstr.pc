@@ -1,0 +1,12 @@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libstr
+Description: 
+Version: 
+Requires:
+Conflicts:
+Libs: -L${libdir} -lstr
+Libs.private:
+Cflags: -I${includedir}/str

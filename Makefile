@@ -26,20 +26,36 @@ obj/%.c.o:$(srcdir)%.c
 
 -include $(call obj_to_dep,$(OBJS))
 
-.PHONY:install
+.PHONY:install installdirs
 
 INSTALL?=install
 INSTALL_DATA?=$(INSTALL) -m 644
 
-DESTDIR?=
-prefix?=/usr/local
-exec_prefix?=$(prefix)
-includedir?=$(prefix)/include
-libdir?=$(exec_prefix)/lib
+default_prefix?=/usr/local
+default_exec_prefix?=$(prefix)
+default_includedir?=$(prefix)/include
+default_libdir?=$(exec_prefix)/lib
 
-install:libstr.a
-	$(INSTALL_DATA) $(wildcard *.h) $(DESTDIR)$(includedir)/
-	$(INSTALL_DATA) libstr.a $(DESTDIR)$(libdir)/
+DESTDIR?=
+prefix?=$(default_prefix)
+exec_prefix?=$(default_exec_prefix)
+includedir?=$(default_includedir)
+libdir?=$(default_libdir)
+
+HDRS:=$(wildcard $(srcdir)include/str/*.h)
+
+install:libstr.a installdirs
+	$(INSTALL_DATA) $(HDRS) $(subst /,\,$(DESTDIR)$(includedir)/str/)
+	$(INSTALL_DATA) libstr.a $(subst /,\,$(DESTDIR)$(libdir)/)
+	$(file >$(DESTDIR)$(libdir)/pkgconfig/libstr.pc,prefix=$(prefix))
+	cat libstr.pc >>$(DESTDIR)$(libdir)/pkgconfig/libstr.pc
+
+mkdir_1=if not exist $1 md $1 2>nul
+mkdir=$(call mkdir_1,$(subst /,\,$1))
+
+installdirs:
+	$(call mkdir,$(DESTDIR)$(includedir)/str/)
+	$(call mkdir,$(DESTDIR)$(libdir)/pkgconfig/)
 
 # -- Unit tests --
 
@@ -61,4 +77,3 @@ obj/%.cpp.o:$(srcdir)%.cpp
 	$(CXX) -c -MMD -o $@ $(CPPFLAGS) $(CXXFLAGS) $<
 
 -include $(call obj_to_dep,$(CHECK_OBJS))
-
