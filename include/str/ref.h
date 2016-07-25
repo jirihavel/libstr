@@ -7,12 +7,11 @@
 extern "C" {
 #endif
 
-#include <assert.h>
-#include <ctype.h>
+// -- Interface --
+
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
-#include <string.h>
 
 struct StrRef_s;
 typedef struct StrRef_s StrRef;
@@ -29,6 +28,8 @@ inline StrRef str_ref_cstr(char const * str);
 inline bool str_ref_is_null(StrRef ref);
 inline bool str_ref_is_empty(StrRef ref);
 
+inline bool str_ref_cmp_eq(StrRef a, StrRef b);
+
 // -- Access --
 
 inline size_t str_ref_len(StrRef ref);
@@ -38,7 +39,7 @@ inline char const * str_ref_ptr(StrRef ref);
 
 inline StrRef str_ref_tail(StrRef ref, size_t n);
 inline StrRef str_ref_init(StrRef ref, size_t n);
-inline StrRef str_ref_substr(StrRef ref, size_t idx, size_t len /*= SIZE_MAX*/);
+inline StrRef str_ref_substr(StrRef ref, size_t idx, size_t len STR_DEFAULT(SIZE_MAX));
 
 // -- Decomposition --
 
@@ -48,6 +49,12 @@ StrRef str_ref_word_c(StrRef * ref, char c)
 
 inline StrRef str_ref_chop_spaces(StrRef ref);
 inline StrRef str_ref_trim_spaces(StrRef ref);
+
+// -- Implementation --
+
+#include <assert.h>
+#include <ctype.h>
+#include <string.h>
 
 /** \brief Weak reference to character array.
  *
@@ -106,6 +113,13 @@ inline bool str_ref_is_empty(StrRef ref)
     return ref.len == 0;
 }
 
+inline bool str_ref_cmp_eq(StrRef a, StrRef b)
+{
+    STR_REF_ASSERT(&a);
+    STR_REF_ASSERT(&b);
+    return (a.len == b.len) && ((a.ptr == b.ptr) || (memcmp(a.ptr, b.ptr, a.len) == 0));
+}
+
 // -- Access --
 
 inline size_t str_ref_len(StrRef ref)
@@ -141,11 +155,9 @@ inline StrRef str_ref_init(StrRef ref, size_t n)
 inline StrRef str_ref_substr(StrRef ref, size_t idx, size_t len)
 {
     STR_REF_ASSERT(&ref);
-    if(idx > ref.len)
-        return str_ref_null();
-    if(len > (ref.len-idx))
-        len = (ref.len-idx);
-    return str_ref(ref.ptr + idx, len);
+    return idx <= ref.len
+        ? str_ref(ref.ptr + idx, len > (ref.len-idx) ? ref.len-idx : len)
+        : str_ref_null();
 }
 
 // -- Decomposition --
@@ -154,7 +166,9 @@ inline StrRef str_ref_chop_spaces(StrRef ref)
 {
     STR_REF_ASSERT(&ref);
     while((ref.len > 0) && isspace(ref.ptr[ref.len-1]))
+    {
         --ref.len;
+    }
     return ref;
 } 
 

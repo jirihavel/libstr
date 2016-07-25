@@ -6,10 +6,6 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-inline StrKeyValRef str_kvr(StrRef key, StrRef val);
-inline StrRef str_kvr_key(StrKeyValRef const * kvr);
-inline StrRef str_kvr_val(StrKeyValRef const * kvr);
-
 // returns false for ' ' since it is detected separately
 static inline bool must_www_form_escape(char c)
 {

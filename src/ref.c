@@ -12,6 +12,8 @@ StrRef str_ref_cstr(char const * str);
 bool str_ref_is_null(StrRef ref);
 bool str_ref_is_empty(StrRef ref);
 
+bool str_ref_cmp_eq(StrRef a, StrRef b);
+
 // -- Access --
 
 size_t str_ref_len(StrRef ref);

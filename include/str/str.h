@@ -193,8 +193,9 @@ bool str_str_fmt(StrStr * str, char const * fmt, ...)
 typedef enum StrTag_e
 {
     STR_TAG_SSO = 0x0,// short strong string (ShortStringOptimization)
-    STR_TAG_STR = 0x2,// long strong string
-    STR_TAG_REF = 0x1 // long weak string
+    STR_TAG_STR = 0x2,// long strong string (ptr != null, len <= cap > 0)
+    STR_TAG_REF = 0x1 // long weak string (cap == 0)
+    // TODO REF with readable ptr[len]
     //STR_TAG_??? = 0x3 unused for now
 } StrTag;
 
@@ -230,13 +231,13 @@ typedef union StrStr_u
 // -- Internal functions --
 
 inline StrTag str_str_get_tag(StrStr const * str)
-    __attribute__((nonnull));
+    __attribute__((nonnull, pure));
 inline char const * str_str_get_ptr(StrStr const * str)
-    __attribute__((nonnull));
+    __attribute__((nonnull, pure));
 inline int str_str_get_len(StrStr const * str)
-    __attribute__((nonnull));
+    __attribute__((nonnull, pure));
 inline int str_str_get_cap(StrStr const * str)
-    __attribute__((nonnull));
+    __attribute__((nonnull, pure));
 inline void str_str_set_tag(StrStr * str, StrTag tag)
     __attribute__((nonnull));
 inline void str_str_set_len(StrStr * str, int len)

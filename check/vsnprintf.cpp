@@ -11,12 +11,13 @@ int test_fun(char * dst, size_t cap, char const * fmt, ...)
     return len;
 }
 
-TEST_CASE("vsnprintf", "[vsnprintf]")
+TEST_CASE("vsnprintf returns correct length", "[vsnprintf]")
 {
     char test[20];
-    for(size_t i = 0; i < 21; ++i)
+    for(size_t capacity = 0; capacity < 21; ++capacity)
     {
-        int c = test_fun(test, i, "%d 3 %s", 666, "abcfjfjFUJ");
-        CHECK(c == 16);
+        CAPTURE(capacity)
+        int length = test_fun(test, capacity, "%d 3 %s", 666, "abcfjfjFUJ");
+        CHECK(length == 16);
     }
 }

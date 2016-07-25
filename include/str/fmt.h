@@ -3,6 +3,7 @@
 
 #include <str/api.h>
 #include <str/ref.h>
+#include <str/kvr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,13 +39,6 @@ size_t str_enc_uri(char ** dst, size_t * cap, StrRef ref);
 size_t str_enc_www_form_component_size(StrRef ref);
 size_t str_enc_www_form_component(char ** dst, size_t * cap, StrRef ref);
 
-struct StrKeyValRef_s;
-typedef struct StrKeyValRef_s StrKeyValRef;
-
-inline StrKeyValRef str_kvr(StrRef key, StrRef val);
-inline StrRef str_kvr_key(StrKeyValRef const * kvr);
-inline StrRef str_kvr_val(StrKeyValRef const * kvr);
-
 size_t str_enc_www_form_size(StrKeyValRef const * data, size_t cnt);
 size_t str_enc_www_form(char ** dst, size_t * cap, StrKeyValRef const * data, size_t cnt);
 
@@ -52,36 +46,6 @@ size_t str_enc_www_form(char ** dst, size_t * cap, StrKeyValRef const * data, si
 
 size_t str_enc_data_uri_size(StrRef mime, StrRef data);
 size_t str_enc_data_uri(char ** dst, size_t * cap, StrRef mime, StrRef data);
-
-// -- Implementation --
-
-/** \brief Key-value pair of string references.
- */
-struct StrKeyValRef_s
-{
-    char const * key;
-    char const * val;
-    unsigned key_len;
-    unsigned val_len;
-};
-
-inline StrKeyValRef str_kvr(StrRef key, StrRef val)
-{
-    assert(key.len <= UINT_MAX);
-    assert(val.len <= UINT_MAX);
-    return (StrKeyValRef) { .key = key.ptr, .val = val.ptr,
-        .key_len = (unsigned)key.len, .val_len = (unsigned)val.len };
-}
-
-inline StrRef str_kvr_key(StrKeyValRef const * kvr)
-{
-    return str_ref(kvr->key, kvr->key_len);
-}
-
-inline StrRef str_kvr_val(StrKeyValRef const * kvr)
-{
-    return str_ref(kvr->val, kvr->val_len);
-}
 
 #ifdef __cplusplus
 }
