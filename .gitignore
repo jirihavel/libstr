@@ -1,2 +1,4 @@
 .vimjunk
+bin
+lib
 obj
