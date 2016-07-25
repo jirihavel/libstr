@@ -1,0 +1,2 @@
+# libstr
+C string utilities
