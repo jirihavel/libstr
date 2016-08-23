@@ -32,4 +32,14 @@ $(STR_CHECK_FLG):FLAGS:=-std=c++11 -Wall -Wextra
 
 check:$(call em_link_bin,check,$(call em_compile,$(wildcard $(srcdir)check/*.cpp),$(STR_CHECK_FLG)) $(STR) $(B64))
 	$<
+
+# -- Unit tests --
+
+STR_INFO_FLG:=$(call em_flags,str_info)
+$(STR_INFO_FLG):INCLUDE_DIRS:=$(srcdir)include
+$(STR_INFO_FLG):FLAGS:=-std=c++11 -Wall -Wextra
+
+info:$(call em_link_bin,info,$(call em_compile,$(wildcard $(srcdir)info/*.cpp),$(STR_INFO_FLG)) $(STR) $(B64))
+	$<
+
 #end

@@ -2,6 +2,8 @@
 
 #include "catch.hpp"
 
+#include <iostream>
+
 void check_ref_null(StrRef ref);
 void check_ref_empty(StrRef ref);
 
@@ -65,7 +67,7 @@ TEST_CASE("StrStr construction", "[str]")
 
         check_str_null(&str);
     }
-
+/*
     GIVEN("null by weak init")
     {
         StrStr str;
@@ -73,7 +75,7 @@ TEST_CASE("StrStr construction", "[str]")
 
         check_str_null(&str);
     }
-    
+*/    
     GIVEN("empty")
     {
         StrStr str;
@@ -97,7 +99,7 @@ TEST_CASE("StrStr construction", "[str]")
 
         check_str_empty(&str);
     }
-
+/*
     GIVEN("empty by weak init")
     {
         StrStr str;
@@ -106,7 +108,7 @@ TEST_CASE("StrStr construction", "[str]")
 
         check_str_empty(&str);
     }
-
+*/
     GIVEN("const")
     {
         StrStr str;

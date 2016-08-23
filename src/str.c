@@ -2,7 +2,7 @@
 #include <str/str.h>
 
 #include <stdio.h>
-
+#if 0
 /** \brief Get content type.
  */
 StrTag str_str_get_tag(StrStr const * str);
@@ -170,3 +170,4 @@ bool str_str_fmt(StrStr * str, char const * fmt, ...)
         str_str_set_null(str);
     return ok;
 }
+#endif

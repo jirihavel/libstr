@@ -4,30 +4,41 @@
 
 TEST_CASE("str_add_char", "[fmt]")
 {
-    char * dst;
-    size_t cap, len;
-
     char tmp[2];
 
-    for(size_t c = 0; c < sizeof(tmp); ++c)
-    {
-        dst = tmp;
-        cap = c;
-        len = str_add_char(&dst, &cap, 'a');
-        CHECK( !dst );
-        CHECK( cap == 0 );
-        CHECK( len == 1 );
-    }
-    dst = tmp;
-    cap = sizeof(tmp);
-    len = str_add_char(&dst, &cap, 'a');
-    CHECK( *dst == '\0' );
-    CHECK( cap == 1 );
-    CHECK( len == 1 );
-    CHECK( dst == tmp + len );
-    CHECK( strcmp(tmp, "a") == 0 );
-}
+    GIVEN("Too small output array")
+        for(size_t c = 0; c < sizeof(tmp); ++c)
+        {
+            char * dst = tmp;
+            size_t cap = c;
+            size_t len = str_add_char(&dst, &cap, 'a');
+            THEN("str_add_char resets the output")
+            {
+                CHECK( !dst );
+                CHECK( cap == 0 );
+            }
+            THEN("str_add_char returns expected length")
+                CHECK( len == 1 );
+        }
 
+    GIVEN("Sufficient array")
+    {
+        char * dst = tmp;
+        size_t cap = sizeof(tmp);
+        size_t len = str_add_char(&dst, &cap, 'a');
+        THEN("Output is zero terminated")
+            CHECK( *dst == '\0' );
+        THEN("Output is correct")
+            CHECK( strcmp(tmp, "a") == 0 );
+        THEN("dst and cap advance correctly")
+        {
+            CHECK( cap == 1 );
+            CHECK( len == 1 );
+            CHECK( dst == tmp + len );
+        }
+    }
+}
+/*
 TEST_CASE("str_enc_www_form_component", "[fmt]")
 {
     char tmp[256];
@@ -83,6 +94,7 @@ TEST_CASE("str_enc_www_form_component", "[fmt]")
     CHECK( dst == tmp + len);
     CHECK( dc == tmp );
 }
+*/
 /*
 BOOST_AUTO_TEST_CASE( str_simple_test )
 {

@@ -5,16 +5,72 @@
 #include <str/ref.h>
 
 #ifdef __cplusplus
+# include <cassert>
+# include <climits>
+# include <cstdarg>
+# include <cstdbool>
+# include <cstdint>
+# include <cstdlib>
+# include <cstring>
+#else
+# include <assert.h>
+# include <limits.h>
+# include <stdarg.h>
+# include <stdbool.h>
+# include <stdint.h>
+# include <stdlib.h>
+# include <string.h>
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <assert.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+
+// weak, strong (reference or hold data?)
+// - weak can be automatically promoted to strong
+// - strong is always mutable
+// - weak can be immutable (references to other strings)
+//   - or mutable (use small stack array and reallocate if needed)
+// empty, null (special case)
+// -> strong
+// ptr, sso
+
+// cases :
+// null
+// - special case of empty (REF, ptr=nullptr, len=0, cap=0)
+// - zt
+// empty
+// - (REF[_RT]/STR/SSO, ptr="", len=0, cap=0)
+// - zt
+// const
+// - (REF[_RT], ptr=..., len=..., cap=0)
+// - ?t
+// weak
+// - (REF_RT, ptr=...(cap+1B), len=..., cap=...)
+// - cap=0 (single byte array) doesn't make sense
+// - zt
+// strong
+// - (STR, ptr=malloc(cap+1), len=..., cap=...)
+// - (SSO, ...)
+// - 1 additional byte is allocated for terminator
+// - zt
+//
+// == Layout ==
+// REP (REF[_RT]/STR)
+// - ppppppppffffffff
+// - ptr 4/8B
+// - flg uint64_t (2*31b + 2b)
+//   - tag (2b)  = flg >> 62 (two highest bits, correspond to last byte of SSO struct)
+//   - len (31b) = flg & INT_MAX
+//   - cap (31b) = (flg >> 31) & INT_MAX
+// SSO
+// - xxxxxxxxxxxxxxxy
+// - dat sizeof(Rep)-1B (STR_SSO_CAP) (11/15B)
+// - flg 1B uint8_t
+//   - tag (2b) = flg >> 6
+//   - len (6b) = STR_SSO_CAP - flg (flg must be 0 for len=STR_SSO_CAP and tag is 0 in SSO mode)
+//   - cap = STR_SSO_CAP
 
 union StrStr_u;
 typedef union StrStr_u StrStr;
@@ -31,12 +87,12 @@ inline void str_str_init_empty(StrStr * str)
     __attribute__((nonnull));
 inline void str_str_init_move(StrStr * restrict dst, StrStr * restrict src)
     __attribute__((nonnull));
-inline void str_str_init_weak(StrStr * str, char * ptr, int len, unsigned cap)
-    __attribute__((nonnull(1)));
 inline void str_str_init_const(StrStr * str, StrRef ref)
     __attribute__((nonnull));
-//inline bool str_str_init_copy(StrStr * str, StrRef ref)
-//    __attribute__((nonnull));
+inline bool str_str_init_copy(StrStr * str, StrRef ref)
+    __attribute__((nonnull));
+inline void str_str_init_weak(StrStr * str, char * ptr, StrLen len, unsigned cap)
+    __attribute__((nonnull(1)));
 
 // -- Deinitialization --
 
@@ -51,18 +107,20 @@ inline bool str_str_is_empty(StrStr const * str)
     __attribute__((nonnull));
 inline bool str_str_is_mutable(StrStr const * str)
     __attribute__((nonnull));
+inline bool str_str_is_strong(StrStr const * str)
+    __attribute__((nonnull));
 
 // -- Access --
 
-inline int str_str_len(StrStr const * str)
+inline StrLen str_str_len(StrStr const * str)
     __attribute__((nonnull));
-inline int str_str_cap(StrStr const * str)
+inline StrLen str_str_cap(StrStr const * str)
     __attribute__((nonnull));
 inline char const * str_str_ptr(StrStr const * str)
     __attribute__((nonnull));
-inline char * str_str_ptr_mut(StrStr * str)
-    __attribute__((nonnull));
 inline StrRef str_str_ref(StrStr const * str)
+    __attribute__((nonnull));
+inline char * str_str_ptr_mut(StrStr * str)
     __attribute__((nonnull));
 
 // -- Assignment --
@@ -75,14 +133,16 @@ inline void str_str_set_empty(StrStr * str)
     __attribute__((nonnull));
 inline void str_str_set_move(StrStr * restrict dst, StrStr * restrict src)
     __attribute__((nonnull));
-inline void str_str_set_weak(StrStr * str, char * ptr, int len, unsigned cap)
-    __attribute__((nonnull(1)));
 inline void str_str_set_const(StrStr * str, StrRef ref)
     __attribute__((nonnull));
+inline bool str_str_set_copy(StrStr * str, StrRef ref)
+    __attribute__((nonnull));
+inline void str_str_set_weak(StrStr * str, char * ptr, int len, unsigned cap)
+    __attribute__((nonnull(1)));
 
 // -- Allocation --
 
-bool str_str_alloc(StrStr * str, int cap, int len);
+bool str_str_alloc(StrStr * str, StrLen cap, StrLen len);
 
 // -- Modification --
 
@@ -90,8 +150,8 @@ inline char const * str_str_cstr(StrStr * str)
     __attribute__((nonnull));
 inline bool str_str_cat(StrStr * str, StrRef ref)
     __attribute__((nonnull));
-bool str_str_fmt(StrStr * str, char const * fmt, ...)
-    __attribute__((format(printf, 2, 3)));
+//bool str_str_fmt(StrStr * str, char const * fmt, ...)
+//    __attribute__((format(printf, 2, 3)));
 
 // Behavior :
 //
@@ -124,7 +184,7 @@ bool str_str_fmt(StrStr * str, char const * fmt, ...)
 //
 
 
-
+// Layout
 //4+4+4 :
 //- ptr, cap, len
 //- cap - 31b, 1b available
@@ -189,14 +249,17 @@ bool str_str_fmt(StrStr * str, char const * fmt, ...)
 /** \brief Type of string contents.
  *
  * All types of string should behave identically from the outside.
+ *
+ * Checks :
+ * - tag != STR_TAG_SSO -> rep
+ * - tag >= STR_TAG_REF -> ref
  */
 typedef enum StrTag_e
 {
-    STR_TAG_SSO = 0x0,// short strong string (ShortStringOptimization)
-    STR_TAG_STR = 0x2,// long strong string (ptr != null, len <= cap > 0)
-    STR_TAG_REF = 0x1 // long weak string (cap == 0)
-    // TODO REF with readable ptr[len]
-    //STR_TAG_??? = 0x3 unused for now
+    STR_TAG_SSO = 0x0,
+    STR_TAG_STR = 0x1,
+    STR_TAG_REF = 0x2,
+    STR_TAG_REF_RT = 0x3,
 } StrTag;
 
 /** \brief Long string representation.
@@ -204,8 +267,7 @@ typedef enum StrTag_e
 typedef struct StrRep_s
 {
     char * ptr;
-    unsigned len;
-    unsigned cap;
+    uint64_t flg;
 } StrRep;
 
 #define STR_SSO_CAP (sizeof(StrRep)-1)
@@ -213,12 +275,17 @@ typedef struct StrRep_s
 typedef struct StrSSO_s
 {
     char dat[STR_SSO_CAP];
-    unsigned char len;
+    uint8_t flg;
 } StrSSO;
 
-/** \brief Simple string.
+/** \brief Not so simple string.
  *
- * Can represent strings up to INT_MAX characters.
+ * Can represent strings up to STR_LEN_MAX characters.
+ *
+ * Can either hold strings by value (strong) or by reference (weak).
+ *
+ *
+ * Uses small string optimization. On x64 can hold up to 15B strings without allocation.
  */
 typedef union StrStr_u
 {
@@ -230,50 +297,64 @@ typedef union StrStr_u
 
 // -- Internal functions --
 
-inline StrTag str_str_get_tag(StrStr const * str)
+inline StrTag STR_STR_TAG(StrStr const * str)
     __attribute__((nonnull, pure));
-inline char const * str_str_get_ptr(StrStr const * str)
+inline char const * STR_STR_PTR_OPT(StrStr const * str)
     __attribute__((nonnull, pure));
-inline int str_str_get_len(StrStr const * str)
+inline char const * STR_STR_PTR(StrStr const * str)
     __attribute__((nonnull, pure));
-inline int str_str_get_cap(StrStr const * str)
+inline StrLen STR_STR_LEN(StrStr const * str)
     __attribute__((nonnull, pure));
-inline void str_str_set_tag(StrStr * str, StrTag tag)
-    __attribute__((nonnull));
-inline void str_str_set_len(StrStr * str, int len)
-    __attribute__((nonnull));
-inline void str_str_set_tag_len_cap(StrStr * str, StrTag tag, int len, int cap)
-    __attribute__((nonnull));
-inline void str_str_set_len_cap(StrStr * str, int len, int cap)
-    __attribute__((nonnull));
+inline StrLen STR_STR_CAP(StrStr const * str)
+    __attribute__((nonnull, pure));
 
-inline StrTag str_str_get_tag(StrStr const * str)
+inline StrTag STR_STR_TAG(StrStr const * str)
 {
     // uses sso structure even for long strings
-    return (StrTag)(str->sso.len>>(CHAR_BIT-2));
+    return (StrTag)(str->sso.flg>>(CHAR_BIT-2));
 }
 
-inline int str_str_get_len(StrStr const * str)
+inline char const * STR_STR_PTR_OPT(StrStr const * str)
 {
-    return str_str_get_tag(str) == STR_TAG_SSO
-        ? STR_SSO_CAP - str->sso.len
-        : str->rep.len & INT_MAX;
+    return STR_STR_TAG(str) == STR_TAG_SSO
+        ? str->sso.dat
+        : str->rep.ptr;
 }
 
-inline int str_str_get_cap(StrStr const * str)
+inline char const * STR_STR_PTR(StrStr const * str)
 {
-    // 2nd msb of cap is stored as msb of len
-    return str_str_get_tag(str) == STR_TAG_SSO
+    return STR_STR_TAG(str) == STR_TAG_SSO
+        ? str->sso.dat
+        : str->rep.ptr
+            ? str->rep.ptr
+            : "";
+}
+
+inline StrLen STR_STR_LEN(StrStr const * str)
+{
+    return STR_STR_TAG(str) == STR_TAG_SSO
+        ? STR_SSO_CAP - str->sso.flg
+        : str->rep.flg & INT_MAX;
+}
+
+inline StrLen STR_STR_CAP(StrStr const * str)
+{
+    return STR_STR_TAG(str) == STR_TAG_SSO
         ? STR_SSO_CAP
-        : (str->rep.cap & (INT_MAX>>1)) | ((str->rep.len & (INT_MAX+1u))>>1);
+        : (str->rep.flg >> 31) & INT_MAX;
 }
 
-inline char const * str_str_get_ptr(StrStr const * str)
+inline uint64_t STR_STR_REP_FLG(StrTag tag, StrLen len, StrLen cap)
 {
-    return str_str_get_tag(str) == STR_TAG_SSO
-        ? str->sso.dat : str->rep.ptr;
+    return ((uint64_t)tag << 62) | ((uint64_t)cap << 31) | len;
 }
 
+#define STR_STR_ASSERT(p) do { assert((p));                            \
+    if(STR_STR_PTR_OPT(p)) { assert(STR_STR_LEN(p) >= 0); }            \
+    else { assert(STR_STR_LEN(p) == 0); assert(STR_STR_CAP(p) == 0); } \
+} while(false)
+
+#if 0
 #define STR_STR_ASSERT(p) do { assert((p));                                    \
     if(str_str_get_ptr(p)) { assert(str_str_get_len(p) >= 0);                  \
         if(str_str_get_cap(p) != 0) {                                          \
@@ -281,65 +362,23 @@ inline char const * str_str_get_ptr(StrStr const * str)
             assert(str_str_get_ptr(p)[str_str_get_len(p)] == '\0'); } }        \
     else { assert(str_str_get_len(p) == 0); assert(str_str_get_cap(p) == 0); } \
 } while(false)
-
-inline void str_str_set_tag(StrStr * str, StrTag tag)
-{
-    assert(((int)tag >= 0) && ((int)tag <= 2));
-    // Uses sso structure even for long strings
-    str->sso.len = (tag<<(CHAR_BIT-2)) | (str->sso.len&(UCHAR_MAX>>2));
-    // postcondition check
-    assert(str_str_get_tag(str) == tag);
-}
-
-inline void str_str_set_len(StrStr * str, int len)
-{
-    assert(len >= 0);
-    assert((str_str_get_cap(str) == 0) || (len <= str_str_get_cap(str)));
-    if(str_str_get_tag(str) == STR_TAG_SSO)
-        str->sso.len = STR_SSO_CAP - len;
-    else
-        str->rep.len = len | (str->rep.len & (INT_MAX+1u));
-    // postcondition check
-    assert(str_str_get_len(str) == len);
-}
-
-inline void str_str_set_tag_len_cap(StrStr * str, StrTag tag, int len, int cap)
-{
-    assert((tag == STR_TAG_STR) || (tag == STR_TAG_REF));
-    assert(len >= 0); assert(cap >= 0);
-    assert((cap == 0) || (len <= cap));
-    str->rep.len = len | ((cap<<1) & (INT_MAX+1u));
-    str->rep.cap = (cap & (INT_MAX>>1)) | (tag<<(INT_BIT-2));
-    // postcondition check
-    assert(str_str_get_tag(str) == tag);
-    assert(str_str_get_len(str) == len);
-    assert(str_str_get_cap(str) == cap);
-}
-
-inline void str_str_set_len_cap(StrStr * str, int len, int cap)
-{
-    str_str_set_tag_len_cap(str, str_str_get_tag(str), len, cap);
-}
+#endif
 
 // -- Construction --
 
 inline void str_str_init_null(StrStr * str)
 {
+    assert(str);
     // init as weak reference with NULL pointer
-    // - ptr=NULL, len=0, cap=REF 0...0
-    memset(str, 0, sizeof(StrStr));
-    str->sso.len = STR_TAG_REF<<(CHAR_BIT-2);
-    // postcondition check
-    assert(str_str_is_null(str));// PRE str ok
+    str->rep.ptr = NULL;
+    str->rep.flg = STR_STR_REP_FLG(STR_TAG_REF_RT, 0, 0);
 }
 
 inline void str_str_init_empty(StrStr * str)
 {
     // init as short string
-    memset(str->sso.dat, 0, sizeof(StrStr));
-    str->sso.len = STR_SSO_CAP; // set len=0
-    // postcondition check
-    assert(str_str_is_empty(str));// PRE str ok
+    memset(str->sso.dat, 0, STR_SSO_CAP);
+    str->sso.flg = STR_SSO_CAP;// set len=0
 }
 
 inline void str_str_init_move(StrStr * restrict dst, StrStr * restrict src)
@@ -352,6 +391,47 @@ inline void str_str_init_move(StrStr * restrict dst, StrStr * restrict src)
         str_str_init_null(src);// POST src null
     }
 }
+
+inline void str_str_init_const(StrStr * str, StrRef ref)
+{
+    STR_REF_ASSERT(ref);
+    str->rep.ptr = (char*)ref.ptr;// preserve null
+    str->rep.flg = STR_STR_REP_FLG(
+        str_ref_is_read_term(ref) ? STR_TAG_REF_RT : STR_TAG_REF,
+        STR_REF_LEN(ref), 0);
+}
+
+inline bool str_str_init_copy(StrStr * str, StrRef ref)
+{
+    STR_REF_ASSERT(ref);
+    StrLen const len = STR_REF_LEN(ref);
+    if(len <= (StrLen)STR_SSO_CAP)
+    {
+        memcpy(str->sso.dat, STR_REF_PTR(ref), len);
+        str->sso.dat[len] = '\0';
+        str->sso.flg = STR_SSO_CAP - len;
+    }
+    else
+    {
+        str->rep.ptr = (char*)malloc(len + 1u);
+        if(!str->rep.ptr)
+        {
+            return false;
+        }
+        memcpy(str->rep.ptr, STR_REF_PTR(ref), len);
+        str->rep.ptr[len] = '\0';
+        str->rep.flg = STR_STR_REP_FLG(STR_TAG_STR, len, len);
+    }
+    return true;
+}
+
+inline void str_str_init_weak(StrStr * str, char * ptr, StrLen len, unsigned cap)
+{
+    str->rep.ptr = ptr;
+    str->rep.flg = STR_STR_REP_FLG(STR_TAG_REF_RT, len, cap-1);
+}
+
+#if 0
 
 inline void str_str_init_weak(StrStr * str, char * ptr, int len, unsigned cap)
 {
@@ -388,62 +468,62 @@ inline void str_str_init_weak(StrStr * str, char * ptr, int len, unsigned cap)
     STR_STR_ASSERT(str);
 }
 
-inline void str_str_init_const(StrStr * str, StrRef ref)
-{
-    if(ref.len > INT_MAX)
-    {
-        str_str_init_null(str);
-    }
-    else
-    {
-        str->rep.ptr = (char*)ref.ptr;
-        str_str_set_tag_len_cap(str, STR_TAG_REF, ref.len, 0);
-        // postconditions
-        assert(!str_str_is_mutable(str));// PRE str ok
-    }
-}
-
-/** \brief Initialize string by copy of ref.
- *
- * \return false if ref is too big or allocation failed.
- */
-//inline bool str_str_init_copy(StrStr * str, StrRef ref)
-//{
-//    return false;
-//}
-
+#endif
 // -- Queries
 
 inline bool str_str_is_null(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    return !str_str_get_ptr(str);
+    return !STR_STR_PTR_OPT(str);
 }
 
 inline bool str_str_is_empty(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    return str_str_get_len(str) == 0;
+    return STR_STR_LEN(str) == 0;
+}
+
+inline bool STR_STR_IS_MUTABLE(StrStr const * str)
+{
+    return STR_STR_CAP(str) > 0;
 }
 
 inline bool str_str_is_mutable(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    return str_str_get_cap(str) > 0;
+    return STR_STR_IS_MUTABLE(str);
+}
+
+inline bool str_str_is_strong(StrStr const * str)
+{
+    STR_STR_ASSERT(str);
+    return STR_STR_TAG(str) < STR_TAG_REF;
+}
+
+inline bool STR_STR_IS_READ_TERM(StrStr const * str)
+{
+    return STR_STR_TAG(str) != STR_TAG_REF;
+}
+
+inline bool STR_STR_IS_ZERO_TERM(StrStr const * str)
+{
+    StrTag const tag = STR_STR_TAG(str);
+    return (tag < STR_TAG_REF)
+        || ((tag == STR_TAG_REF_RT) && (str->rep.ptr[STR_STR_LEN(str)] == '\0'));
 }
 
 // -- Access --
 
-inline int str_str_len(StrStr const * str)
+inline StrLen str_str_len(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    return str_str_get_len(str);
+    return STR_STR_LEN(str);
 }
 
-inline int str_str_cap(StrStr const * str)
+inline StrLen str_str_cap(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    return str_str_get_cap(str);
+    return STR_STR_CAP(str);
 }
 
 /** \brief Read-only data pointer.
@@ -453,72 +533,43 @@ inline int str_str_cap(StrStr const * str)
 inline char const * str_str_ptr(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    char const * ptr = str_str_get_ptr(str);
-    return ptr ? ptr : "";
-}
-
-/** \brief Get string data pointer if the contents are mutable.
- *
- * \return NULL for immutable contents
- */
-inline char * str_str_ptr_mut(StrStr * str)
-{
-    return str_str_is_mutable(str)// PRE str ok
-        ? (char *)str_str_get_ptr(str) : NULL;
+    return STR_STR_PTR(str);
 }
 
 inline StrRef str_str_ref(StrStr const * str)
 {
     STR_STR_ASSERT(str);
-    return str_ref(str_str_get_ptr(str), str_str_get_len(str));
+    return STR_REF(STR_STR_PTR_OPT(str), STR_STR_LEN(str), STR_STR_IS_READ_TERM(str));
 }
 
+inline char * STR_STR_PTR_MUT(StrStr * str)
+{
+    if(!STR_STR_IS_MUTABLE(str))
+    {
+        StrStr aux;
+        if(!str_str_init_copy(&aux, str_str_ref(str)))
+        {
+            return NULL;
+        }
+        // only mutable strings need release, just overwrite str
+        *str = aux;
+    }
+    char const * ptr = STR_STR_PTR_OPT(str);
+    assert(ptr);
+    return (char*)ptr;
+}
 
-// -- Assignment --
-
-inline void str_str_kill(StrStr * str)
+/** \brief Get pointer to mutable content.
+ *
+ * If the string is immutable, the function tries to make it mutable.
+ *
+ * \return NULL if turning mutable failed (allocation failure).
+ */
+inline char * str_str_ptr_mut(StrStr * str)
 {
     STR_STR_ASSERT(str);
-    // free data if long strong string
-    if(str_str_get_tag(str) == STR_TAG_STR)
-        free(str->rep.ptr);
+    return STR_STR_PTR_MUT(str);
 }
-
-inline void str_str_set_null(StrStr * str)
-{
-    str_str_kill(str);// PRE  str ok
-    str_str_init_null(str);// POST str ok
-}
-
-inline void str_str_set_empty(StrStr * str)
-{
-    if(str_str_is_mutable(str))// PRE str ok
-        str_str_ptr_mut(str)[0] = '\0';
-    str_str_set_len(str, 0);// POST len == x
-}
-
-inline void str_str_set_move(StrStr * restrict dst, StrStr * restrict src)
-{
-    if(dst != src)
-    {
-        str_str_kill(dst);
-        str_str_init_move(dst, src);
-    }
-}
-
-inline void str_str_set_weak(StrStr * str, char * ptr, int len, unsigned cap)
-{
-    str_str_kill(str);// PRE str ok
-    str_str_init_weak(str, ptr, len, cap);// POST str ok
-}
-
-inline void str_str_set_const(StrStr * str, StrRef ref)
-{
-    str_str_kill(str);
-    str_str_init_const(str, ref);
-}
-
-// -- Modifications --
 
 /** \brief Get pointer to zero-terminated string contents.
  *
@@ -530,38 +581,186 @@ inline void str_str_set_const(StrStr * str, StrRef ref)
  */
 inline char const * str_str_cstr(StrStr * str)
 {
-    int const str_len = str_str_len(str);// PRE str ok
-    char const * ptr = str_str_get_ptr(str);
-    // if not null-terminated, reallocate
-    bool ok = ptr && (ptr[str_len] == '\0');
-    if(!ok)
-    {
-        ok = str_str_alloc(str, -1, str_len);// puts zero-term
-        ptr = str_str_get_ptr(str);
-    }
-    // ensure string does not contain '\0'
-    return ok && !memchr(ptr, '\0', str_len) ? ptr : NULL;
+    STR_STR_ASSERT(str);
+    return STR_STR_IS_ZERO_TERM(str)
+        ? STR_STR_PTR(str)
+        : STR_STR_PTR_MUT(str);
 }
+
+// -- ... --
+
+inline void STR_STR_KILL(StrStr * str)
+{
+    if(STR_STR_TAG(str) == STR_TAG_STR)
+    {
+        free(str->rep.ptr);
+    }
+}
+
+inline void str_str_kill(StrStr * str)
+{
+    STR_STR_ASSERT(str);
+    STR_STR_KILL(str);
+}
+
+// -- Assignment --
+
+inline void str_str_set_null(StrStr * str)
+{
+    STR_STR_ASSERT(str);
+    STR_STR_KILL(str);
+    str_str_init_null(str);
+}
+
+inline void str_str_set_empty(StrStr * str)
+{
+    STR_STR_ASSERT(str);
+    STR_STR_KILL(str);
+    str_str_init_empty(str);
+}
+
+inline void str_str_set_move(StrStr * restrict dst, StrStr * restrict src)
+{
+    STR_STR_ASSERT(dst);
+    STR_STR_ASSERT(src);
+    if(dst != src)
+    {
+        STR_STR_KILL(dst);
+        str_str_init_move(dst, src);
+    }
+}
+
+inline void str_str_set_const(StrStr * str, StrRef ref)
+{
+    STR_STR_ASSERT(str);
+    STR_STR_KILL(str);
+    str_str_init_const(str, ref);
+}
+
+inline bool str_str_set_copy(StrStr * str, StrRef ref)
+{
+    STR_STR_ASSERT(str);
+    StrStr aux;
+    if(!str_str_init_copy(&aux, ref))
+    {
+        return false;
+    }
+    STR_STR_KILL(str);
+    *str = aux;
+    return true;
+}
+
+inline void str_str_set_weak(StrStr * str, char * ptr, int len, unsigned cap)
+{
+    STR_STR_ASSERT(str);
+    STR_STR_KILL(str);
+    str_str_init_weak(str, ptr, len, cap);
+}
+
+#if 0
+
+// -- Modifications --
 
 inline bool str_str_cat(StrStr * str, StrRef ref)
 {
     int const str_len = str_str_len(str);// PRE str ok
-    STR_REF_ASSERT(&ref);
+    STR_REF_ASSERT(ref);
+    StrLen ref_len = STR_REF_LEN(ref);
     // str->len + ref.len <= INT_MAX (0 <= str->len <= INT_MAX)
-    bool const ok = (ref.len <= (size_t)(INT_MAX-str_len))
-        && str_str_alloc(str, str_len+ref.len, INT_MAX);
+    bool const ok = (ref_len <= (size_t)(INT_MAX-str_len))
+        && str_str_alloc(str, str_len+ref_len, INT_MAX);
     if(ok)
     {
         char * ptr = str_str_ptr_mut(str);
-        memcpy(ptr+str_len, ref.ptr, ref.len);
-        ptr[str_len+ref.len] = '\0';
-        str_str_set_len(str, str_len+ref.len);
+        memcpy(ptr+str_len, ref.ptr, ref_len);
+        ptr[str_len+ref_len] = '\0';
+        str_str_set_len(str, str_len+ref_len);
     }
     return ok;
 }
-
-#ifdef __cplusplus
-}
 #endif
+#ifdef __cplusplus
+}//extern "C"
 
+inline StrRef str_ref(StrStr const & str) noexcept
+{
+    return str_str_ref(&str);
+}
+
+namespace str {
+
+class string
+{
+public :
+    using value_type = char;
+    using size_type = StrLen;
+
+    static constexpr size_type npos = STR_LEN_MAX;
+
+    string()
+    {
+        str_str_init_null(&m_str);
+    }
+    string(string && str)
+    {
+        str_str_init_move(&m_str, &str.m_str);
+    }
+    //string(string const & str);
+    template<typename StrRef>
+    string(StrRef const & ref, size_type pos = 0, size_type len = npos)
+    {
+        str_str_init_copy(&m_str, str_ref_substr(str_ref(ref), pos, len));
+    }
+    string(char const * s)
+    {
+        str_str_init_copy(&m_str, str_ref_cstr(s));
+    }
+    string(char const * s, size_type n)
+    {
+        str_str_init_copy(&m_str, str_ref(s, n));
+    }
+    //string(size_type n, char c);
+    //template<typename InputIterator>
+    //string(InputIterator beg, InputIterator end);
+    //string(std::initializer_list<char> il);
+
+    ~string() noexcept;
+
+    string & operator=(string str) noexcept;//but parameter copying may throw
+
+    bool empty() const
+    {
+        return STR_STR_LEN(&m_str) == 0;
+    }
+    size_type size() const
+    {
+        return STR_STR_LEN(&m_str);
+    }
+    size_type max_size() const
+    {
+        return STR_LEN_MAX;
+    }
+    size_type capacity() const
+    {
+        return STR_STR_CAP(&m_str);
+    }
+    void clear();
+    void shrink_to_fit();
+    void resize(size_type n);
+    void reserve(size_type n);
+    
+    char const & back() const;
+    char       & back();
+    char const & front() const;
+    char       & front();
+    char const & at(size_type i) const;
+    char       & at(size_type i);
+    char const & operator[](size_type i) const;
+    char       & operator[](size_type i);
+private :
+    StrStr m_str;
+};
+
+}//namespace str
+#endif//__cplusplus
 #endif//LIBSTR_STR_H_INCLUDED

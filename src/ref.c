@@ -2,27 +2,37 @@
 
 // -- Constructors --
 
-StrRef str_ref(char const * ptr, size_t len);
 StrRef str_ref_null();
 StrRef str_ref_empty();
 StrRef str_ref_cstr(char const * str);
+StrRef str_ref(char const * ptr, StrLen len, StrTerm term);
 
 // -- Queries --
 
 bool str_ref_is_null(StrRef ref);
 bool str_ref_is_empty(StrRef ref);
+bool str_ref_is_read_term(StrRef ref);
+bool str_ref_is_zero_term(StrRef ref);
 
 bool str_ref_cmp_eq(StrRef a, StrRef b);
 
 // -- Access --
 
-size_t str_ref_len(StrRef ref);
+/** \brief Get string length.
+ *
+ * \return string length in [0, STR_LEN_MAX]
+ */
+StrLen str_ref_len(StrRef ref);
 
 /** \brief Get pointer.
  *
- * Returned pointer is never NULL even for null string.
+ * \return pointer that is never NULL even for null string.
  */
 char const * str_ref_ptr(StrRef ref);
+
+/** \brief Convert string to memory reference.
+ */
+MemRef str_ref_mem(StrRef ref);
 
 // -- Substrings --
 
@@ -30,37 +40,30 @@ char const * str_ref_ptr(StrRef ref);
  *
  * n==0 is identity.
  * If n > string length, null string is returned.
- * null -> null
  */
-StrRef str_ref_tail(StrRef ref, size_t n);
+StrRef str_ref_tail(StrRef ref, StrLen n);
 
-/** \brief Returns n initial characters.
+/** \brief Return string without last n characters.
  *
- * If n >= string length, original string is returned.
- * null -> null
+ * n == 0 is identity
+ * If n > string length, null string is returned.
  */
-StrRef str_ref_init(StrRef ref, size_t n);
+StrRef str_ref_init(StrRef ref, StrLen n);
 
 /** \brief Returns substring of len characters, starting at idx.
  *
- * if len is too big, it is shortened, idx==0 is identity.
- * if idx is too big, null is returned.
+ * If len is too big, it is shortened.
+ * If idx > string length, null is returned.
  */
-StrRef str_ref_substr(StrRef ref, size_t idx, size_t len);
+StrRef str_ref_substr(StrRef ref, StrLen idx, StrLen len);
 
 // -- Decomposition --
 
 /** \brief Find position of character in string.
  *
- * Returns SIZE_MAX if not found.
+ * Returns STR_LEN_MAX if not found.
  */
-size_t str_ref_find_c(StrRef ref, char c)
-{
-    STR_REF_ASSERT(&ref);
-    char const * const ptr = memchr(ref.ptr, c, ref.len);
-    assert(!ptr || (ptr >= ref.ptr));
-    return ptr ? (size_t)(ptr - ref.ptr) : SIZE_MAX;
-}
+StrLen str_ref_find_c(StrRef ref, char c);
 
 /** \brief Cut and return first word.
  *
@@ -77,24 +80,55 @@ size_t str_ref_find_c(StrRef ref, char c)
  */
 StrRef str_ref_word_c(StrRef * ref, char c)
 {
-    STR_REF_ASSERT(ref);
-    char const * const ptr = memchr(ref->ptr, c, ref->len);
-    StrRef ret;
-    ret.ptr = ref->ptr;
+    assert(ref);
+    STR_REF_ASSERT(*ref);
+    StrLen const ref_len = STR_REF_LEN(*ref);
+    char const * const ptr = memchr(ref->ptr, c, ref_len);
     if(ptr)
     {
-        ret.len = ptr - ref->ptr;
-        assert(ret.len < ref->len);
-        ref->ptr += ret.len + 1;
-        ref->len -= ret.len + 1;
+        assert(ptr >= ref->ptr);
+        StrLen const len = ptr - ref->ptr;
+        *ref = STR_REF_TAIL(*ref, len + 1);
+        return STR_REF(ptr, len, true);
     }
     else
     {
-        ret.len = ref->len;
-        ref->ptr += ref->len;
-        ref->len = 0;
+        StrRef ret = STR_REF(ref->ptr, ref_len, ref->flg & 0x1);
+        *ref = STR_REF(ref->ptr + ref_len, 0, ref->flg & 0x1);
+        return ret;
     }
-    return ret;
+}
+
+static inline StrRef STR_REF_CHOP(StrRef ref, int (*is_char)(int))
+{
+    unsigned len = STR_REF_LEN(ref);
+    bool read_term = ref.flg & 0x1;
+    while((len > 0) && is_char(ref.ptr[len]))
+    {
+        read_term = true;
+        --len;
+    }
+    ref.flg = (len << 1) + read_term;
+    return ref;
+} 
+
+StrRef str_ref_chop(StrRef ref, int (*is_char)(int))
+{
+    STR_REF_ASSERT(ref);
+    return STR_REF_CHOP(ref, is_char);
+}
+
+StrRef str_ref_trim(StrRef ref, int (*is_char)(int))
+{
+    STR_REF_ASSERT(ref);
+    unsigned len = STR_REF_LEN(ref);
+    while((len > 0) && is_char(ref.ptr[0]))
+    {
+        ++ref.ptr;
+        --len;
+    }
+    ref.flg = (len << 1) + (ref.flg & 0x1);
+    return STR_REF_CHOP_SPACES(ref);
 }
 
 /** \brief Chop trailing spaces.

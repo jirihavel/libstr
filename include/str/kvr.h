@@ -8,45 +8,48 @@
 extern "C" {
 #endif
 
+#include <assert.h>
+#include <limits.h>
+
 // -- Interface --
 
 struct StrKeyValRef_s;
 typedef struct StrKeyValRef_s StrKeyValRef;
 
 inline StrKeyValRef str_kvr(StrRef key, StrRef val);
-inline StrRef str_kvr_key(StrKeyValRef const * kvr);
-inline StrRef str_kvr_val(StrKeyValRef const * kvr);
+inline StrRef str_kvr_key(StrKeyValRef kvr);
+inline StrRef str_kvr_val(StrKeyValRef kvr);
 
 // -- Implementation --
 
-#include <limits.h>
-
 /** \brief Key-value pair of string references.
+ *
+ * On architectures such as x64, it has size of three pointers instead of four as two StrRefs.
  */
 struct StrKeyValRef_s
 {
     char const * key;
     char const * val;
-    unsigned key_len;
-    unsigned val_len;
+    unsigned key_flg;
+    unsigned val_flg;
 };
 
 inline StrKeyValRef str_kvr(StrRef key, StrRef val)
 {
-    assert(key.len <= UINT_MAX);
-    assert(val.len <= UINT_MAX);
+    STR_REF_ASSERT(key);
+    STR_REF_ASSERT(val);
     return (StrKeyValRef) { .key = key.ptr, .val = val.ptr,
-        .key_len = (unsigned)key.len, .val_len = (unsigned)val.len };
+        .key_flg = key.flg, .val_flg = val.flg };
 }
 
-inline StrRef str_kvr_key(StrKeyValRef const * kvr)
+inline StrRef str_kvr_key(StrKeyValRef kvr)
 {
-    return str_ref(kvr->key, kvr->key_len);
+    return (StrRef) { .ptr = kvr.key, .flg = kvr.key_flg };
 }
 
-inline StrRef str_kvr_val(StrKeyValRef const * kvr)
+inline StrRef str_kvr_val(StrKeyValRef kvr)
 {
-    return str_ref(kvr->val, kvr->val_len);
+    return (StrRef) { .ptr = kvr.val, .flg = kvr.val_flg };
 }
 
 #ifdef __cplusplus

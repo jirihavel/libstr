@@ -12,8 +12,9 @@ static inline bool must_www_form_escape(char c)
     return !isalnum(c) && (c != ' ') && (c != '*') && (c != '-') && (c != '.') && (c != '_');
 }
 
-size_t str_enc_www_form_component_size(StrRef ref)
+size_t str_enc_www_form_component_size(MemRef ref)
 {
+    MEM_REF_ASSERT(ref);
     size_t size = 0;
     for(size_t i = 0; i < ref.len; ++i)
     {
@@ -22,8 +23,9 @@ size_t str_enc_www_form_component_size(StrRef ref)
     return size;
 }
 
-size_t str_enc_www_form_component(char ** out, size_t * cap, StrRef ref)
+size_t str_enc_www_form_component(char ** out, size_t * cap, MemRef ref)
 {
+    MEM_REF_ASSERT(ref);
     size_t size = 0;
     if(*cap > 0)
     {
@@ -82,15 +84,17 @@ size_t str_enc_www_form(char ** out, size_t * cap, StrKeyValRef const * data, si
         {
             size += str_add_char(out, cap, '&');
         }
-        size += str_enc_www_form_component(out, cap, str_kvr_key(data + i));
-        if(data[i].val && (data[i].val_len > 0))
+        size += str_enc_www_form_component(out, cap, str_ref_mem(str_kvr_key(data[i])));
+        StrRef const val = str_kvr_val(data[i]);
+        if(!str_ref_is_empty(val))
         {
             size += str_add_char(out, cap, '=');
-            size += str_enc_www_form_component(out, cap, str_kvr_val(data + i));
+            size += str_enc_www_form_component(out, cap, str_ref_mem(val));
         }
     }
     return size;
 }
+
 /*
 size_t str_enc_b64_n(char ** dst, size_t * cap, char const * src, size_t len)
 {

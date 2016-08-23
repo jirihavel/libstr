@@ -1,7 +1,7 @@
 #define _ISOC99_SOURCE
 #include <str/fmt.h>
 
-#include <str/ref_b16.h>
+#include <str/b16.h>
 
 #include <limits.h>
 #include <stdarg.h>
@@ -106,13 +106,14 @@ size_t str_add_char(char ** dst, size_t * cap, char c)
  */
 ssize_t str_fmt(char ** dst, size_t * cap, char const * fmt, ...)
 {
+    static_assert(INT_MAX <= SSIZE_MAX, "");
     // snprintf
     va_list args;
     va_start(args, fmt);
     int ret = vsnprintf(dst ? *dst : NULL, cap ? *cap : 0, fmt, args);
     va_end(args);
     // Update dst and cap
-    if((ret >= 0) && cap && ((size_t)ret < *cap) && (ret <= SSIZE_MAX))
+    if((ret >= 0) && cap && ((size_t)ret < *cap))
     {
         // success
         *dst += ret;
@@ -135,60 +136,66 @@ ssize_t str_fmt(char ** dst, size_t * cap, char const * fmt, ...)
 
 size_t str_cpy(char ** dst, size_t * cap, StrRef ref)
 {
-    if(dst && cap && (*cap > ref.len))
+    STR_REF_ASSERT(ref);
+    unsigned const len = STR_REF_LEN(ref);
+    if(dst && cap && (*cap > len))
     {
-        memcpy(*dst, ref.ptr, ref.len);
-        *dst += ref.len;
-        *cap -= ref.len;
+        memcpy(*dst, ref.ptr, len);
+        *dst += len;
+        *cap -= len;
         **dst = '\0';
     }
     else
     {
         str_rst_dst(dst, cap);
     }
-    return ref.len;
+    return len;
 }
 
 // -- Copy tolower --
 
 size_t str_cpy_tolower(char ** dst, size_t * cap, StrRef ref)
 {
-    if(dst && cap && (*cap > ref.len))
+    STR_REF_ASSERT(ref);
+    unsigned const len = STR_REF_LEN(ref);
+    if(dst && cap && (*cap > len))
     {
-        for(size_t i = 0; i < ref.len; ++i)
+        for(unsigned i = 0; i < len; ++i)
             (*dst)[i] = tolower(ref.ptr[i]);
-        (*dst)[ref.len] = '\0';
-        *dst += ref.len;
-        *cap -= ref.len;
+        (*dst)[len] = '\0';
+        *dst += len;
+        *cap -= len;
     }
     else
     {
         str_rst_dst(dst, cap);
     }
-    return ref.len;
+    return len;
 }
 
 // -- Copy toupper --
 
 size_t str_cpy_toupper(char ** dst, size_t * cap, StrRef ref)
 {
-    if(dst && cap && (*cap > ref.len))
+    STR_REF_ASSERT(ref);
+    unsigned const len = STR_REF_LEN(ref);
+    if(dst && cap && (*cap > len))
     {
-        for(size_t i = 0; i < ref.len; ++i)
+        for(unsigned i = 0; i < len; ++i)
             (*dst)[i] = toupper(ref.ptr[i]);
-        (*dst)[ref.len] = '\0';
-        *dst += ref.len;
-        *cap -= ref.len;
+        (*dst)[len] = '\0';
+        *dst += len;
+        *cap -= len;
     }
     else
     {
         str_rst_dst(dst, cap);
     }
-    return ref.len;
+    return len;
 }
 
 // -- Base16 --
-
+#if 0
 /** \brief Hex decode string.
  *
  * The string contents are not checked, so decoding can fail if size succeeds.
@@ -251,5 +258,5 @@ size_t str_enc_B16_n(char ** dst, size_t * cap, StrRef ref)
     }
     return 2*ref.len;
 }
-
+#endif
 /** \} */
