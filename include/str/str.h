@@ -1,31 +1,16 @@
 #ifndef LIBSTR_STR_H_INCLUDED
 #define LIBSTR_STR_H_INCLUDED
 
-#include <str/api.h>
 #include <str/ref.h>
 
 #ifdef __cplusplus
-# include <cassert>
-# include <climits>
-# include <cstdarg>
-# include <cstdbool>
 # include <cstdint>
 # include <cstdlib>
-# include <cstring>
+extern "C" {
 #else
-# include <assert.h>
-# include <limits.h>
-# include <stdarg.h>
-# include <stdbool.h>
 # include <stdint.h>
 # include <stdlib.h>
-# include <string.h>
 #endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 
 // weak, strong (reference or hold data?)
 // - weak can be automatically promoted to strong

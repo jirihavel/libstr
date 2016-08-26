@@ -1,15 +1,11 @@
 #ifndef LIBSTR_KEY_VALUE_REFERENCE_H_INCLUDED
 #define LIBSTR_KEY_VALUE_REFERENCE_H_INCLUDED
 
-#include <str/api.h>
 #include <str/ref.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <assert.h>
-#include <limits.h>
 
 // -- Interface --
 
@@ -53,7 +49,17 @@ inline StrRef str_kvr_val(StrKeyValRef kvr)
 }
 
 #ifdef __cplusplus
-}
-#endif
+}//extern "C"
 
+namespace str {
+
+template<typename StrKey, typename StrVal>
+StrKeyValRef kvr(StrKey const & key, StrVal const & val)
+{
+    return str_kvr(str_ref(key), str_ref(val));
+}
+
+}//namespace str
+
+#endif//__cplusplus
 #endif//LIBSTR_KEY_VALUE_REFERENCE_H_INCLUDED 

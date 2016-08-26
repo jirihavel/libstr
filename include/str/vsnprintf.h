@@ -4,11 +4,13 @@
 #include <str/api.h>
 
 #ifdef __cplusplus
+# include <cstdarg>
+# include <cstddef>
 extern "C" {
+#else
+# include <stdarg.h>
+# include <stddef.h>
 #endif
-
-#include <stdarg.h>
-#include <stddef.h>
 
 /** \brief Tiny wrapper over vsnprintf.
  *
@@ -17,7 +19,6 @@ extern "C" {
 int str_vsnprintf(char * s, size_t n, char const * f, va_list a);
 
 #ifdef __cplusplus
-}
+}//extern "C"
 #endif
-
 #endif//LIBSTR_VSNPRINTF_H_INCLUDED

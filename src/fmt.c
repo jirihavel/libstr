@@ -1,11 +1,7 @@
 #define _ISOC99_SOURCE
 #include <str/fmt.h>
 
-#include <str/b16.h>
-
-#include <limits.h>
 #include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
 
 #ifndef SSIZE_MAX
@@ -194,69 +190,4 @@ size_t str_cpy_toupper(char ** dst, size_t * cap, StrRef ref)
     return len;
 }
 
-// -- Base16 --
-#if 0
-/** \brief Hex decode string.
- *
- * The string contents are not checked, so decoding can fail if size succeeds.
- */
-ssize_t str_dec_b16_n(char ** dst, size_t * cap, StrRef ref)
-{
-    ssize_t size = str_decode_b16_size(ref.len);
-    if((size >= 0) && (*cap > (size_t)size))
-    {
-        if(str_decode_b16(*dst, ref))
-        {
-            *dst += size;
-            *cap -= size;
-            return size;
-        }
-        else
-        {
-            size = -1;
-        }
-    }
-    // decoding error or dst too small
-    str_rst_dst(dst, cap); 
-    return size;
-}
-
-/** \brief Hex encode string using lowercase character.
- *
- * \return 2*len
- */
-size_t str_enc_b16_n(char ** dst, size_t * cap, StrRef ref)
-{
-    if(*cap > 2*ref.len)
-    {
-        str_encode_b16(*dst, ref);
-        *dst += 2*ref.len;
-        *cap -= 2*ref.len;
-    }
-    else
-    {
-        str_rst_dst(dst, cap);
-    }
-    return 2*ref.len;
-}
-
-/** \brief Hex encode string using uppercase character.
- *
- * \return 2*len
- */
-size_t str_enc_B16_n(char ** dst, size_t * cap, StrRef ref)
-{
-    if(*cap > 2*ref.len)
-    {
-        str_encode_B16(*dst, ref);
-        *dst += 2*ref.len;
-        *cap -= 2*ref.len;
-    }
-    else
-    {
-        str_rst_dst(dst, cap);
-    }
-    return 2*ref.len;
-}
-#endif
 /** \} */

@@ -1,9 +1,5 @@
 #include <str/b16.h>
 
-#include <assert.h>
-#include <ctype.h>
-#include <stdbool.h>
-
 static inline int B16_dec_char(char x)
 {
     x = toupper(x);
@@ -56,6 +52,8 @@ bool str_decode_b16(char * restrict dst, StrRef ref)
  */
 void str_encode_b16(char * restrict dst, MemRef ref)
 {
+    assert(dst);
+    MEM_REF_ASSERT(ref);
     static char const HEX[] = "0123456789abcdef";
     char const * const restrict src = ref.ptr;
     for(size_t i = 0; i < ref.len; ++i)
@@ -68,6 +66,8 @@ void str_encode_b16(char * restrict dst, MemRef ref)
 
 void str_encode_B16(char * restrict dst, MemRef ref)
 {
+    assert(dst);
+    MEM_REF_ASSERT(ref);
     static char const HEX[] = "0123456789ABCDEF";
     char const * const restrict src = ref.ptr;
     for(size_t i = 0; i < ref.len; ++i)
@@ -76,4 +76,71 @@ void str_encode_B16(char * restrict dst, MemRef ref)
         dst[2*i+1] = HEX[(src[i]   )&0xf];
     }
     dst[2*ref.len] = '\0';
+}
+
+/** \brief Hex decode string.
+ *
+ * The string contents are not checked, so decoding can fail even if size succeeds.
+ */
+ssize_t str_dec_b16_n(char ** dst, size_t * cap, StrRef ref)
+{
+    STR_REF_ASSERT(ref);
+    StrLen const len = STR_REF_LEN(ref);
+    ssize_t size = len%2 == 0 ? len/2 : -1;
+    if((size >= 0) && dst && cap && (*cap > (size_t)size))
+    {
+        if(str_decode_b16(*dst, ref))
+        {
+            *dst += size;
+            *cap -= size;
+            return size;
+        }
+        else
+        {
+            size = -1;
+        }
+    }
+    // decoding error or dst too small
+    str_rst_dst(dst, cap); 
+    return size;
+}
+
+/** \brief Hex encode string using lowercase character.
+ *
+ * \return 2*len
+ */
+size_t str_enc_b16_n(char ** dst, size_t * cap, MemRef ref)
+{
+    MEM_REF_ASSERT(ref);
+    if(dst && cap && (*cap > 2*ref.len))
+    {
+        str_encode_b16(*dst, ref);
+        *dst += 2*ref.len;
+        *cap -= 2*ref.len;
+    }
+    else
+    {
+        str_rst_dst(dst, cap);
+    }
+    return 2*ref.len;
+}
+
+/** \brief Hex encode string using uppercase character.
+ *
+ * \return 2*len
+ */
+size_t str_enc_B16_n(char ** dst, size_t * cap, MemRef ref)
+{
+    MEM_REF_ASSERT(ref);
+    if(dst && cap && *cap > 2*ref.len)
+    {
+        str_encode_B16(*dst, ref);
+        *dst += 2*ref.len;
+        *cap -= 2*ref.len;
+    }
+    else
+    {
+        str_rst_dst(dst, cap);
+    }
+    return 2*ref.len;
 }

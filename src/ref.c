@@ -63,7 +63,7 @@ StrRef str_ref_substr(StrRef ref, StrLen idx, StrLen len);
  *
  * Returns STR_LEN_MAX if not found.
  */
-StrLen str_ref_find_c(StrRef ref, char c);
+StrLen str_ref_find_c(StrRef ref, int c);
 
 /** \brief Cut and return first word.
  *
@@ -78,7 +78,7 @@ StrLen str_ref_find_c(StrRef ref, char c);
  *   foo(word);
  * }
  */
-StrRef str_ref_word_c(StrRef * ref, char c)
+StrRef str_ref_word_c(StrRef * ref, int c)
 {
     assert(ref);
     STR_REF_ASSERT(*ref);

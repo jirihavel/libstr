@@ -4,15 +4,19 @@
 #include <str/api.h>
 
 #ifdef __cplusplus
+//# include <cassert>
+//# include <climits>
+//# include <cstdbool>
+# include <cstddef>
 extern "C" {
+#else
+//# include <assert.h>
+//# include <limits.h>
+//# include <stdbool.h>
+# include <stddef.h>
 #endif
 
 // -- Interface --
-
-#include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stddef.h>
 
 struct MemRef_s;
 typedef struct MemRef_s MemRef;
@@ -46,6 +50,8 @@ struct MemRef_s
 };
 
 /** \brief Check all invariants.
+ *
+ * TODO : how to scan it?
  */
 #define MEM_REF_ASSERT(ref) do {                        \
     assert((ref).ptr || ((ref).len == 0));              \
@@ -105,7 +111,13 @@ inline char const * mem_ref_ptr(MemRef ref)
 }
 
 #ifdef __cplusplus
-}
-#endif
+}//extern "C"
 
+inline MemRef mem_ref(MemRef const & ref) noexcept
+{
+    MEM_REF_ASSERT(ref);
+    return ref;
+}
+
+#endif
 #endif//LIBSTR_MEM_H_INCLUDED

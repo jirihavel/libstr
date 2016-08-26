@@ -2,12 +2,15 @@
 #define LIBSTR_API_H_INCLUDED
 
 #ifdef __cplusplus
+# include <cassert>
+# include <climits>
+# include <cstdbool>
 extern "C" {
+#else
+# include <assert.h>
+# include <limits.h>
+# include <stdbool.h>
 #endif
-
-#include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
 
 // Only C++ has default function parameters
 #if defined(__cplusplus)
@@ -44,7 +47,6 @@ typedef enum StrTerm_e
 } StrTerm;
 
 #ifdef __cplusplus
-}
+}//extern "C"
 #endif
-
 #endif//LIBSTR_API_H_INCLUDED
