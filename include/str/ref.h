@@ -246,11 +246,8 @@ inline StrRef str_ref_init(StrRef ref, StrLen n)
     return ref;
 }
 
-inline StrRef str_ref_substr(StrRef ref, StrLen idx, StrLen len)
+inline StrRef STR_REF_SUBSTR(StrRef ref, StrLen idx, StrLen len)
 {
-    STR_REF_ASSERT(ref);
-    assert(idx >= 0);
-    assert(len >= 0);
     ref = STR_REF_TAIL(ref, idx);
     StrLen ref_len = STR_REF_LEN(ref);
     if(len > ref_len)
@@ -258,6 +255,14 @@ inline StrRef str_ref_substr(StrRef ref, StrLen idx, StrLen len)
         len = ref_len;
     }
     return STR_REF(ref.ptr, ref_len, (ref.flg & 0x1) || (len < ref_len));
+}
+
+inline StrRef str_ref_substr(StrRef ref, StrLen idx, StrLen len)
+{
+    STR_REF_ASSERT(ref);
+    assert(idx >= 0);
+    assert(len >= 0);
+    return STR_REF_SUBSTR(ref, idx, len);
 }
 
 // -- Decomposition --
@@ -303,6 +308,23 @@ inline StrRef str_ref_trim_spaces(StrRef ref)
     ref.flg = (len << 1) + (ref.flg & 0x1);
     return STR_REF_CHOP_SPACES(ref);
 } 
+
+inline bool str_ref_match_prefix(StrRef ref, StrRef prefix, StrRef * rest)
+{
+    STR_REF_ASSERT(ref);
+    STR_REF_ASSERT(prefix);
+    StrLen const pre_len = STR_REF_LEN(prefix);
+    if(((StrLen)STR_REF_LEN(ref) >= pre_len) &&
+       (memcmp(STR_REF_PTR(ref), STR_REF_PTR(prefix), pre_len) == 0))
+    {
+        if(rest)
+        {
+            *rest = STR_REF_SUBSTR(ref, pre_len, STR_LEN_MAX);
+        }
+        return true;
+    }
+    return false;
+}
 
 #ifdef __cplusplus
 }//extern "C"
